@@ -82,8 +82,12 @@ the DMG.
 
 ### Continuous integration and releases
 
-`.github/workflows/build.yml` runs the encoder tests on Linux and macOS, builds the universal app and DMG on a
-macOS runner, launches the app as a smoke test, and uploads the DMG as a build artifact. A GitHub Release
+`.github/workflows/build.yml` runs the encoder tests on Linux and macOS, and runs the app tests on a macOS
+runner. The app tests cover settings, shortcuts, selection drag/move/resize/keyboard logic and the GIF list with
+folder watching and clipboard. They also render PNG snapshots of every screen and make **live ScreenCaptureKit
+recordings** that check every pixel's color and position and confirm Giffie's own windows are excluded. The
+workflow then builds the universal app and DMG, launches the app as a smoke test, and uploads the DMG, UI snapshots
+and a first-launch screenshot as build artifacts. A GitHub Release
 (`v<VERSION>`) with the DMG is published when:
 
 * a `v*` tag is pushed,
@@ -101,6 +105,7 @@ Package.swift
 Sources/GiffieCore/     streaming GIF encoder (LZW, quantizer, frame diffing, limits) – pure Swift
 Sources/Giffie/         the macOS app (AppKit + SwiftUI + ScreenCaptureKit)
 Tests/GiffieCoreTests/  encoder tests with an independent GIF decoder (+ ImageIO cross-check on macOS)
+Tests/GiffieAppTests/   app tests: UI logic, snapshots, live capture (macOS only)
 Resources/              Info.plist, app icon
 scripts/                build-dmg.sh, make-icon.py
 ```
