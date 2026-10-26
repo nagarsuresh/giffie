@@ -11,9 +11,13 @@ on:
         description: "Publish a GitHub Release (v<VERSION>) with the DMG"
         type: boolean
         default: true
+      print_snapshots:
+        description: "Also print the UI snapshots (base64) into the job log"
+        type: boolean
+        default: false
 
 concurrency:
-  group: build-${{ github.ref }}
+  group: build-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -116,6 +120,16 @@ jobs:
           name: Giffie-launch-screenshot
           path: build/snapshots/first-launch-screen.png
           if-no-files-found: ignore
+
+      - name: Print UI snapshots (debug)
+        if: github.event_name == 'workflow_dispatch' && inputs.print_snapshots
+        run: |
+          for f in build/snapshots/*; do
+            echo "=== SNAPSHOT $(basename "$f")"
+            base64 -i "$f" | tr -d '\n'
+            echo
+            echo "=== END"
+          done
 
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4

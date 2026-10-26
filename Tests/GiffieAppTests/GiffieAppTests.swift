@@ -3,6 +3,7 @@ import Carbon
 import CoreGraphics
 import GiffieCore
 import ImageIO
+import QuartzCore
 import SwiftUI
 import XCTest
 @testable import Giffie
@@ -331,22 +332,20 @@ final class GiffieAppTests: XCTestCase {
 
     // MARK: - Recording (needs Screen Recording permission)
 
-    func testRecorderCapturesScreen() async throws {
-        guard CGPreflightScreenCaptureAccess() else {
-            throw XCTSkip("Screen Recording permission is not available in this environment")
-        }
-        let screen = try XCTUnwrap(NSScreen.main)
-        let displayID = try XCTUnwrap(screen.displayID)
-        let request = RecordingRequest(
+    /// Records `area` for `duration` seconds and returns the finished GIF.
+    private func record(_ area: CaptureArea, duration: TimeInterval, excludesOwnWindows: Bool) async throws -> RecordingOutput {
+        let displayID = try XCTUnwrap(area.screen.displayID)
+        var request = RecordingRequest(
             displayID: displayID,
-            sourceRect: CGRect(x: 0, y: 0, width: 400, height: 300),
-            pixelWidth: 400,
-            pixelHeight: 300,
+            sourceRect: area.displayRect,
+            pixelWidth: Int(area.localRect.width),
+            pixelHeight: Int(area.localRect.height),
             framesPerSecond: 15,
-            showsCursor: true,
+            showsCursor: false,
             maxColors: 256,
-            limits: RecordingLimits(maxDuration: 2, maxFileSize: nil)
+            limits: RecordingLimits(maxDuration: duration, maxFileSize: nil)
         )
+        request.excludesOwnWindows = excludesOwnWindows
         let recorder = try ScreenRecorder(request: request)
         let result: Result<RecordingOutput, Error> = try await withCheckedThrowingContinuation { continuation in
             recorder.onFinish = { continuation.resume(returning: $0) }
@@ -358,19 +357,95 @@ final class GiffieAppTests: XCTestCase {
                 }
             }
         }
-        let output = try result.get()
+        return try result.get()
+    }
+
+    /// RGBA pixels of one GIF frame, rows top to bottom.
+    private func pixels(of url: URL, frame: Int) throws -> (width: Int, height: Int, data: [UInt8]) {
+        let source = try XCTUnwrap(CGImageSourceCreateWithURL(url as CFURL, nil))
+        let image = try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, frame, nil))
+        var data = [UInt8](repeating: 0, count: image.width * image.height * 4)
+        let context = try XCTUnwrap(CGContext(data: &data, width: image.width, height: image.height,
+                                              bitsPerComponent: 8, bytesPerRow: image.width * 4,
+                                              space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                              bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        return (image.width, image.height, data)
+    }
+
+    private func color(at x: Int, _ y: Int, in frame: (width: Int, height: Int, data: [UInt8])) -> (r: Int, g: Int, b: Int) {
+        let i = (y * frame.width + x) * 4
+        return (Int(frame.data[i]), Int(frame.data[i + 1]), Int(frame.data[i + 2]))
+    }
+
+    /// Puts a window with a green top-left quadrant and a red/blue blinking
+    /// background exactly where the capture area is, records it, and checks
+    /// the GIF shows those colors in the right places. This proves the
+    /// screen → display coordinate conversion and the capture pipeline.
+    func testRecordingCapturesTheSelectedArea() async throws {
+        guard CGPreflightScreenCaptureAccess() else {
+            throw XCTSkip("Screen Recording permission is not available in this environment")
+        }
+        let screen = try XCTUnwrap(NSScreen.main)
+        let area = CaptureArea(screen: screen, localRect: CGRect(x: 240, y: 180, width: 320, height: 240))
+
+        let window = NSWindow(contentRect: area.globalRect, styleMask: [.borderless], backing: .buffered, defer: false)
+        window.level = .screenSaver
+        window.isOpaque = true
+        window.hasShadow = false
+        let content = NSView(frame: NSRect(origin: .zero, size: area.localRect.size))
+        content.wantsLayer = true
+        let red = CGColor(srgbRed: 1, green: 0, blue: 0, alpha: 1)
+        let blue = CGColor(srgbRed: 0, green: 0, blue: 1, alpha: 1)
+        content.layer?.backgroundColor = red
+        let marker = CALayer()
+        marker.backgroundColor = CGColor(srgbRed: 0, green: 1, blue: 0, alpha: 1)
+        marker.frame = CGRect(x: 0, y: area.localRect.height / 2, width: area.localRect.width / 2,
+                              height: area.localRect.height / 2) // top-left quadrant (layer origin is bottom-left)
+        content.layer?.addSublayer(marker)
+        window.contentView = content
+        window.orderFrontRegardless()
+        spinRunLoop(0.5)
+
+        let blinker = Task { @MainActor in
+            var flip = false
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 150_000_000)
+                flip.toggle()
+                CATransaction.begin()
+                CATransaction.setDisableActions(true)
+                content.layer?.backgroundColor = flip ? blue : red
+                CATransaction.commit()
+            }
+        }
+        let output = try await record(area, duration: 2, excludesOwnWindows: false)
+        blinker.cancel()
+        window.orderOut(nil)
         defer { try? FileManager.default.removeItem(at: output.url) }
-        XCTAssertEqual(output.summary.width, 400)
-        XCTAssertEqual(output.summary.height, 300)
-        XCTAssertGreaterThanOrEqual(output.summary.frameCount, 1)
+
+        XCTAssertEqual(output.summary.width, 320)
+        XCTAssertEqual(output.summary.height, 240)
         XCTAssertEqual(output.summary.duration, 2.0, accuracy: 0.2)
+        XCTAssertGreaterThanOrEqual(output.summary.frameCount, 4, "the blinking background should produce several frames")
         if case .durationLimit = output.reason {} else { XCTFail("expected the time limit to stop the recording") }
 
-        let source = try XCTUnwrap(CGImageSourceCreateWithURL(output.url as CFURL, nil))
-        XCTAssertEqual(CGImageSourceGetCount(source), output.summary.frameCount)
-        let image = try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
-        XCTAssertEqual(image.width, 400)
-        XCTAssertEqual(image.height, 300)
+        let first = try pixels(of: output.url, frame: 0)
+        XCTAssertEqual(first.width, 320)
+        XCTAssertEqual(first.height, 240)
+        let topLeft = color(at: 80, 60, in: first)
+        XCTAssertTrue(topLeft.g > 180 && topLeft.r < 90 && topLeft.b < 90, "top-left should be green, got \(topLeft)")
+        let bottomRight = color(at: 240, 180, in: first)
+        XCTAssertTrue(bottomRight.g < 90 && (bottomRight.r > 180 || bottomRight.b > 180),
+                      "bottom-right should be red or blue, got \(bottomRight)")
+
+        // Both background colors should appear over the course of the GIF.
+        var sawRed = false, sawBlue = false
+        for index in 0..<output.summary.frameCount {
+            let c = color(at: 240, 180, in: try pixels(of: output.url, frame: index))
+            if c.r > 180 && c.b < 90 { sawRed = true }
+            if c.b > 180 && c.r < 90 { sawBlue = true }
+        }
+        XCTAssertTrue(sawRed && sawBlue, "expected the background to blink between red and blue")
 
         if let directory = snapshotDirectory {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -378,5 +453,36 @@ final class GiffieAppTests: XCTestCase {
             try? FileManager.default.removeItem(at: copy)
             try FileManager.default.copyItem(at: output.url, to: copy)
         }
+    }
+
+    /// Giffie's own windows (overlay, toolbar, HUD) must never end up in a GIF.
+    func testRecordingExcludesGiffieWindows() async throws {
+        guard CGPreflightScreenCaptureAccess() else {
+            throw XCTSkip("Screen Recording permission is not available in this environment")
+        }
+        let screen = try XCTUnwrap(NSScreen.main)
+        let area = CaptureArea(screen: screen, localRect: CGRect(x: 240, y: 180, width: 200, height: 150))
+        let window = NSWindow(contentRect: area.globalRect, styleMask: [.borderless], backing: .buffered, defer: false)
+        window.level = .screenSaver
+        let content = NSView(frame: NSRect(origin: .zero, size: area.localRect.size))
+        content.wantsLayer = true
+        content.layer?.backgroundColor = CGColor(srgbRed: 1, green: 0, blue: 1, alpha: 1) // magenta
+        window.contentView = content
+        window.orderFrontRegardless()
+        spinRunLoop(0.5)
+
+        let output = try await record(area, duration: 1, excludesOwnWindows: true)
+        window.orderOut(nil)
+        defer { try? FileManager.default.removeItem(at: output.url) }
+
+        let frame = try pixels(of: output.url, frame: 0)
+        var magenta = 0
+        for y in stride(from: 0, to: frame.height, by: 10) {
+            for x in stride(from: 0, to: frame.width, by: 10) {
+                let c = color(at: x, y, in: frame)
+                if c.r > 200 && c.b > 200 && c.g < 60 { magenta += 1 }
+            }
+        }
+        XCTAssertEqual(magenta, 0, "Giffie's own window was captured")
     }
 }

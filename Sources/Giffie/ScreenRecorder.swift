@@ -15,6 +15,8 @@ struct RecordingRequest {
     var showsCursor: Bool
     var maxColors: Int
     var limits: RecordingLimits
+    /// Leave Giffie's own windows (overlay, toolbar, HUD) out of the GIF.
+    var excludesOwnWindows = true
 }
 
 struct RecordingProgress {
@@ -110,9 +112,19 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
             throw RecorderError.displayNotFound
         }
         // Keep Giffie's own overlay, toolbar and HUD out of the recording.
+        // Excluding the app also covers windows opened later (the HUD); if the
+        // app isn't listed, fall back to excluding the windows open right now.
         let pid = ProcessInfo.processInfo.processIdentifier
         let ownApps = content.applications.filter { $0.processID == pid }
-        let filter = SCContentFilter(display: display, excludingApplications: ownApps, exceptingWindows: [])
+        let filter: SCContentFilter
+        if !request.excludesOwnWindows {
+            filter = SCContentFilter(display: display, excludingWindows: [])
+        } else if !ownApps.isEmpty {
+            filter = SCContentFilter(display: display, excludingApplications: ownApps, exceptingWindows: [])
+        } else {
+            let ownWindows = content.windows.filter { $0.owningApplication?.processID == pid }
+            filter = SCContentFilter(display: display, excludingWindows: ownWindows)
+        }
 
         let config = SCStreamConfiguration()
         config.sourceRect = request.sourceRect
