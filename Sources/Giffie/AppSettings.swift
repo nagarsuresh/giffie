@@ -28,8 +28,8 @@ enum CaptureScale: String, CaseIterable, Identifiable {
 
 /// User preferences, persisted in `UserDefaults`.
 @MainActor
-final class Settings: ObservableObject {
-    static let shared = Settings()
+final class AppSettings: ObservableObject {
+    static let shared = AppSettings()
 
     static let frameRateChoices = [10, 15, 20, 25, 30]
     static let colorChoices = [256, 128, 64]

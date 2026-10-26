@@ -1,7 +1,7 @@
 import AppKit
 import CoreMedia
 import GiffieCore
-import ScreenCaptureKit
+@preconcurrency import ScreenCaptureKit
 
 /// What to record.
 struct RecordingRequest {
@@ -67,8 +67,9 @@ enum RecorderError: LocalizedError {
 /// frame straight into a `StreamingGIFEncoder`.
 ///
 /// All capture and encoding state lives on a private serial queue; callbacks
-/// are delivered on the main actor.
-final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
+/// are delivered on the main actor. That confinement is what makes the
+/// `@unchecked Sendable` conformance safe.
+final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
     let request: RecordingRequest
     let temporaryURL: URL
 

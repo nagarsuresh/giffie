@@ -107,6 +107,9 @@ final class RecordingHUD: NSObject {
         update(RecordingProgress(elapsed: 0, fileSize: 0, frameCount: 0))
     }
 
+    /// The HUD's content (used by snapshot tests).
+    var contentView: NSView? { panel.contentView }
+
     /// Places the HUD below the recorded area (or above / inside if there is no room).
     func show(near area: CGRect, on screen: NSScreen) {
         panel.contentView?.layoutSubtreeIfNeeded()

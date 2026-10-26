@@ -25,7 +25,7 @@ final class RecordingCoordinator: NSObject {
     /// Recording was requested before a save folder was chosen.
     var onNeedsSetup: (() -> Void)?
 
-    private let settings: Settings
+    private let settings: AppSettings
     private var selection: SelectionController?
     private var recorder: ScreenRecorder?
     private var hud: RecordingHUD?
@@ -34,7 +34,7 @@ final class RecordingCoordinator: NSObject {
     private var countdownRemaining = 0
     private var recordingStartDate = Date()
 
-    init(settings: Settings) {
+    init(settings: AppSettings) {
         self.settings = settings
         super.init()
     }
@@ -225,7 +225,7 @@ final class RecordingCoordinator: NSObject {
     /// Moves the finished GIF from the temporary folder into the save folder.
     private func save(_ output: RecordingOutput, startDate: Date) throws -> URL {
         let fileManager = FileManager.default
-        let folder = settings.saveFolder ?? Settings.suggestedSaveFolder
+        let folder = settings.saveFolder ?? AppSettings.suggestedSaveFolder
         let fileName = GiffieFormat.fileName(for: startDate)
         do {
             try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)

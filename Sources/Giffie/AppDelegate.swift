@@ -18,7 +18,7 @@ enum GiffieMain {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private let settings = Settings.shared
+    private let settings = AppSettings.shared
     private let history = HistoryModel()
     private let hotKeys = HotKeyManager()
     private var coordinator: RecordingCoordinator!

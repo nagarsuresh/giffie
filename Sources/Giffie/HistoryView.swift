@@ -13,7 +13,7 @@ struct HistoryActions {
 @MainActor
 struct HistoryView: View {
     @ObservedObject var model: HistoryModel
-    @ObservedObject var settings: Settings
+    @ObservedObject var settings: AppSettings
     let actions: HistoryActions
 
     var body: some View {

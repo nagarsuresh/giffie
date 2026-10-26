@@ -44,7 +44,20 @@ jobs:
           swift --version
 
       - name: Run GiffieCore tests (incl. ImageIO cross-check)
-        run: swift test
+        run: swift test --filter GiffieCoreTests
+
+      - name: Run app tests (UI logic, snapshots, live capture when permitted)
+        env:
+          GIFFIE_SNAPSHOT_DIR: ${{ github.workspace }}/build/snapshots
+        run: swift test --filter GiffieAppTests
+
+      - name: Upload UI snapshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Giffie-snapshots
+          path: build/snapshots
+          if-no-files-found: ignore
 
       - name: Import signing certificate (optional)
         env:
@@ -90,8 +103,19 @@ jobs:
             wait "$PID" || true
             exit 1
           fi
+          # Best effort: screenshot of the first-run window (needs screen capture access on the runner).
+          mkdir -p build/snapshots
+          screencapture -x build/snapshots/first-launch-screen.png || echo "screencapture unavailable"
           kill "$PID"
           echo "Giffie launched and stayed running."
+
+      - name: Upload launch screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Giffie-launch-screenshot
+          path: build/snapshots/first-launch-screen.png
+          if-no-files-found: ignore
 
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4

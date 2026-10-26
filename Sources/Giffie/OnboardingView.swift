@@ -5,7 +5,7 @@ import SwiftUI
 /// the Screen Recording permission and how to record.
 @MainActor
 struct OnboardingView: View {
-    @ObservedObject var settings: Settings
+    @ObservedObject var settings: AppSettings
     let onFinish: () -> Void
 
     @State private var step = 0
@@ -14,10 +14,10 @@ struct OnboardingView: View {
     @State private var permissionGranted: Bool
     @State private var requestedPermission = false
 
-    init(settings: Settings, onFinish: @escaping () -> Void) {
+    init(settings: AppSettings, onFinish: @escaping () -> Void) {
         self.settings = settings
         self.onFinish = onFinish
-        _folder = State(initialValue: settings.saveFolder ?? Settings.suggestedSaveFolder)
+        _folder = State(initialValue: settings.saveFolder ?? AppSettings.suggestedSaveFolder)
         _permissionGranted = State(initialValue: ScreenCapturePermission.isGranted)
     }
 
@@ -87,7 +87,7 @@ struct OnboardingView: View {
             .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.05)))
 
             HStack(spacing: 8) {
-                quickPick("Pictures/Giffie", Settings.suggestedSaveFolder)
+                quickPick("Pictures/Giffie", AppSettings.suggestedSaveFolder)
                 quickPick("Desktop", FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first)
                 quickPick("Movies", FileManager.default.urls(for: .moviesDirectory, in: .userDomainMask).first)
             }

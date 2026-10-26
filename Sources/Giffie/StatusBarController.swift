@@ -15,7 +15,7 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
     private let history: HistoryModel
     private var isRecording = false
 
-    init(history: HistoryModel, settings: Settings) {
+    init(history: HistoryModel, settings: AppSettings) {
         self.history = history
         super.init()
 

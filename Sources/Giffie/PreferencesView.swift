@@ -5,14 +5,14 @@ import SwiftUI
 
 @MainActor
 struct PreferencesView: View {
-    @ObservedObject var settings: Settings
+    @ObservedObject var settings: AppSettings
     /// Called while the shortcut field is capturing keys, so the global hot key can be paused.
     let onShortcutRecording: (Bool) -> Void
 
     @State private var launchAtLogin: Bool
     @State private var permissionGranted: Bool
 
-    init(settings: Settings, onShortcutRecording: @escaping (Bool) -> Void) {
+    init(settings: AppSettings, onShortcutRecording: @escaping (Bool) -> Void) {
         self.settings = settings
         self.onShortcutRecording = onShortcutRecording
         _launchAtLogin = State(initialValue: settings.launchAtLogin)
@@ -45,18 +45,18 @@ struct PreferencesView: View {
 
             Section("Recording") {
                 Picker("Frame rate", selection: $settings.framesPerSecond) {
-                    ForEach(Settings.frameRateChoices, id: \.self) { Text("\($0) fps").tag($0) }
+                    ForEach(AppSettings.frameRateChoices, id: \.self) { Text("\($0) fps").tag($0) }
                 }
                 Picker("Resolution", selection: $settings.captureScale) {
                     ForEach(CaptureScale.allCases) { Text($0.title).tag($0) }
                 }
                 Picker("Colors per frame", selection: $settings.maxColors) {
-                    ForEach(Settings.colorChoices, id: \.self) { count in
+                    ForEach(AppSettings.colorChoices, id: \.self) { count in
                         Text(count == 256 ? "256 (best quality)" : "\(count) (smaller files)").tag(count)
                     }
                 }
                 Picker("Countdown", selection: $settings.countdownSeconds) {
-                    ForEach(Settings.countdownChoices, id: \.self) { seconds in
+                    ForEach(AppSettings.countdownChoices, id: \.self) { seconds in
                         Text(seconds == 0 ? "Off" : "\(seconds) seconds").tag(seconds)
                     }
                 }

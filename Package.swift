@@ -36,6 +36,13 @@ targets.append(
         ]
     )
 )
+targets.append(
+    .testTarget(
+        name: "GiffieAppTests",
+        dependencies: ["Giffie", "GiffieCore"],
+        path: "Tests/GiffieAppTests"
+    )
+)
 #endif
 
 let package = Package(
