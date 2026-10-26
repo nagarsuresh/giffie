@@ -209,9 +209,11 @@ private struct GIFRow: View {
     }
 
     private var relativeDate: String {
+        let now = Date()
+        if abs(item.date.timeIntervalSince(now)) < 60 { return "Just now" }
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .full
-        return formatter.localizedString(for: item.date, relativeTo: Date())
+        return formatter.localizedString(for: min(item.date, now), relativeTo: now)
     }
 
     private func iconButton(_ symbol: String, help: String, action: @escaping () -> Void) -> some View {

@@ -142,6 +142,12 @@ final class WindowPresenter: NSObject, NSWindowDelegate {
         window.styleMask = [.titled, .closable, .miniaturizable]
         window.isReleasedWhenClosed = false
         window.delegate = self
+        // Size to the SwiftUI content first so centering uses the real size.
+        controller.view.layoutSubtreeIfNeeded()
+        let size = controller.view.fittingSize
+        if size.width > 0 && size.height > 0 {
+            window.setContentSize(size)
+        }
         window.center()
         window.makeKeyAndOrderFront(nil)
         self.window = window

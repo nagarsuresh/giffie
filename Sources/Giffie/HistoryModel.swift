@@ -107,6 +107,10 @@ final class HistoryModel: ObservableObject {
             items = []
             return
         }
+        if monitor == nil {
+            // The folder may not have existed when it was chosen.
+            startMonitoring()
+        }
         scanGeneration += 1
         let generation = scanGeneration
         let previous = cache
